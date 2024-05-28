@@ -423,7 +423,6 @@ def update_order(order_id):
             product_ids = order_data.pop("product_ids")
             for orderproduct in order.products:
                 orderproduct.product.stock += orderproduct.quantity
-                session.flush()
                 session.delete(orderproduct)
             quantities = Counter(product_ids)
             for product_id in set(product_ids):
@@ -451,7 +450,6 @@ def delete_order(order_id):
             return jsonify({"error": "Order not found"}), 404
         for orderproduct in order.products:
             orderproduct.product.stock += orderproduct.quantity
-            session.flush()
         session.delete(order)
     return jsonify({"message": "Order removed successfully!"}), 200
 
