@@ -97,7 +97,7 @@ and adds them all
 
 `/products/<int:product_id>`  
 Accepts any subset of product fields and updates the
-customer with the given id
+product with the given id
 
 `/products/<int:product_id>?restock=<int>`  
 Adds restock value to the stock of the given product
