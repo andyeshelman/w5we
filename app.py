@@ -388,7 +388,7 @@ def add_order():
         customer_id = order_data['customer_id']
         customer = session.get(Customer, customer_id)
         if customer is None:
-            err = f"Customer number {order_data['customer_id']} does not exist..."
+            err = f"Customer number {customer_id} does not exist..."
             return jsonify({"error": err}), 404
         product_ids = order_data.pop("product_ids")
         order = Order(**order_data)
@@ -407,7 +407,6 @@ def add_order():
                 return jsonify({"error": err}), 400
             product.stock -= quantity
             order.products.append(OrderProduct(product=product, quantity=quantity))
-            session.flush()
     return jsonify({"message": "New order successfully added!"}), 201
 
 @app.route("/orders/<int:order_id>", methods=["PUT"])
@@ -449,7 +448,7 @@ def delete_order(order_id):
     with Session(db.engine) as session, session.begin():
         order = session.get(Order, order_id)
         if order is None:
-            return jsonify({"error": "Order not found" }), 404
+            return jsonify({"error": "Order not found"}), 404
         for orderproduct in order.products:
             orderproduct.product.stock += orderproduct.quantity
             session.flush()
