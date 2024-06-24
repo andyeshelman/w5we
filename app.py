@@ -213,6 +213,9 @@ def delete_customer(customer_id):
         customer = session.get(Customer, customer_id)
         if customer is None:
             return jsonify({"error": "Customer not found..."}), 404
+        account = session.get(CustomerAccount, customer_id)
+        if account:
+            return jsonify({"error": "Cannot delete customer with active account..."}), 400
         session.delete(customer)
     return jsonify({"message": "Customer removed successfully!"})
 
