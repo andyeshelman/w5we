@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import select, CheckConstraint
+from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
 from flask_marshmallow import Marshmallow
 from marshmallow import fields, validate, ValidationError
@@ -13,6 +13,7 @@ import datetime
 from config import HOST, USER, PASSWORD, DATABASE
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 app.json.sort_keys = False
 app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+mysqlconnector://{USER}:{PASSWORD}@{HOST}/{DATABASE}"
 
@@ -58,7 +59,7 @@ class Product(Base):
     product_id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True)
     name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     price: Mapped[float] = mapped_column(db.Float, nullable=False)
-    stock: Mapped[int] = mapped_column(CheckConstraint("stock >= 0"), default=1)
+    stock: Mapped[int] = mapped_column(default=1)
 
 with app.app_context():
     db.create_all()
@@ -252,7 +253,7 @@ def update_customer_acount(customer_id):
     with Session(db.engine) as session, session.begin():
         account = session.get(CustomerAccount, customer_id)
         if account is None:
-            return jsonify({"message": "Account not found..."}), 404
+            return jsonify({"error": "Account not found..."}), 404
         try:
             account_data = customer_account_schema.load(request.json, partial=True)
         except ValidationError as err:
@@ -308,7 +309,7 @@ def add_product():
 @app.route("/products/<int:product_id>", methods=["PUT"])
 def update_product(product_id):
     with Session(db.engine) as session, session.begin():
-        if restock := request.args.get("restock"):
+        if restock := request.args.get("restock"): # Walrus operator!
             if not restock.isdigit() or int(restock) <= 0:
                 return jsonify({"error": "Restock by positive integer only..."}), 400
             product = session.get(Product, product_id)
@@ -356,7 +357,7 @@ def get_order_details(order_id):
     with Session(db.engine) as session:
         order = session.get(Order, order_id)
         if order is None:
-            return jsonify({"message": "Order Not Found"}), 404
+            return jsonify({"error": "Order Not Found"}), 404
         total_price = 0
         total_quantity = 0
         products = []
@@ -393,14 +394,12 @@ def add_order():
         product_ids = order_data.pop("product_ids")
         order = Order(**order_data)
         session.add(order)
-        quantities = Counter(product_ids)
-        for product_id in set(product_ids):
+        for product_id, quantity in Counter(product_ids).items():
             product = session.get(Product, product_id)
             if product is None:
                 session.rollback()
                 err = f"Product number {product_id} does not exist..."
                 return jsonify({"error": err}), 404
-            quantity = quantities[product_id]
             if product.stock < quantity:
                 session.rollback()
                 err = f"Insufficient supply of Product {product_id} to process this order..."
@@ -414,7 +413,7 @@ def update_order(order_id):
     with Session(db.engine) as session, session.begin():
         order = session.get(Order, order_id)
         if order is None:
-            return jsonify({"message": "Order Not Found"}), 404
+            return jsonify({"error": "Order Not Found"}), 404
         try:
             order_data = order_schema.load(request.json, partial=True)
         except ValidationError as err:
@@ -424,14 +423,12 @@ def update_order(order_id):
             for orderproduct in order.products:
                 orderproduct.product.stock += orderproduct.quantity
                 session.delete(orderproduct)
-            quantities = Counter(product_ids)
-            for product_id in set(product_ids):
+            for product_id, quantity in Counter(product_ids).items():
                 product = session.get(Product, product_id)
                 if product is None:
                     session.rollback()
                     err = f"Product number {product_id} does not exist..."
                     return jsonify({"error": err}), 404
-                quantity = quantities[product_id]
                 if product.stock < quantity:
                     session.rollback()
                     err = f"Insufficient supply of Product {product_id} to process this order..."
